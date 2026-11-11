@@ -106,6 +106,7 @@ td{padding:15px;border-top:1px solid var(--border);font-size:12px}
 <div class="nav" data-target="workers-section"><span class="icon">⚡</span><span>Workers</span></div>
 <div class="nav" data-target="r2-section"><span class="icon">▧</span><span>Archiviazione R2</span></div>
 <div class="section-label">SISTEMA</div>
+<div class="nav" data-target="consumption-section"><span class="icon">◫</span><span>Consumi e capacità</span></div>
 <div class="nav" data-target="alerts-section"><span class="icon">♧</span><span>Avvisi</span></div>
 <div class="nav" data-target="settings-section"><span class="icon">⚙</span><span>Impostazioni</span></div>
 <div class="sidebar-bottom"><strong>Piano Cloudflare</strong>Free · Monitoraggio account</div>
@@ -130,6 +131,10 @@ td{padding:15px;border-top:1px solid var(--border);font-size:12px}
 </div>
 <div class="section-heading" id="applications-section">Le tue applicazioni</div>
 <div class="panel"><table><thead><tr><th>Applicazione</th><th>Worker</th><th>Database D1</th><th>Ultimo aggiornamento</th><th>Stato</th></tr></thead><tbody id="apps"><tr><td colspan="5" class="loading">Caricamento applicazioni...</td></tr></tbody></table></div>
+
+<div class="section-heading" id="workers-section">Workers Cloudflare</div>
+<div class="panel"><table><thead><tr><th>Worker</th><th>ID tecnico</th><th>Versione</th><th>Runtime</th><th>Creato il</th><th>Ultimo aggiornamento</th><th>Binding</th></tr></thead><tbody id="worker-list"><tr><td colspan="7" class="loading">Caricamento Workers...</td></tr></tbody></table></div>
+
 <div class="section-heading" id="database-section">Database D1</div>
 <div class="panel"><table><thead><tr><th>Database</th><th>Dimensione</th><th>Tabelle</th><th>Stato</th></tr></thead><tbody id="databases"><tr><td colspan="4" class="loading">Caricamento database...</td></tr></tbody></table></div>
 <div class="section-heading" id="r2-section">Archiviazione R2</div>
@@ -147,6 +152,70 @@ td{padding:15px;border-top:1px solid var(--border);font-size:12px}
   <p class="metric-sub">Connessione API Cloudflare gestita in modo sicuro dal Worker.</p>
   <p class="metric-sub">Aggiornamento dei dati: manuale tramite il pulsante Aggiorna dati.</p>
   <p class="metric-sub">Token API: custodito nelle variabili segrete, non esposto nel browser.</p>
+</div>
+
+
+<div id="consumption-section" style="display:none">
+  <div class="section-heading">Monitoraggio consumi Cloudflare</div>
+  <div class="panel" style="padding:20px;margin-bottom:20px">
+    <div style="display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;align-items:center">
+      <div>
+        <strong>Consumi e capacità</strong>
+        <p class="metric-sub">Statistiche D1 e Workers degli ultimi 7 giorni. Archiviazione R2 attuale.</p>
+      </div>
+      <button class="refresh" onclick="loadAnalytics()">↻ Aggiorna consumi</button>
+    </div>
+    <p class="metric-sub" id="consumption-status">In attesa del caricamento.</p>
+    <div style="display:flex;gap:18px;flex-wrap:wrap;margin-top:12px">
+      <span id="cons-r2-state" class="pill">R2 · In attesa</span>
+      <span id="cons-d1-state" class="pill">D1 · In attesa</span>
+      <span id="cons-workers-state" class="pill">Workers · In attesa</span>
+    </div>
+    <p class="metric-sub" id="consumption-updated">Ultimo aggiornamento: —</p>
+  </div>
+
+  <div class="grid" style="margin-bottom:22px">
+    <div class="card">
+      <div class="card-title">R2 · SPAZIO UTILIZZATO</div>
+      <div class="metric" id="cons-r2-size">—</div>
+      <div class="metric-sub" id="cons-r2-objects">Oggetti: —</div>
+    </div>
+    <div class="card">
+      <div class="card-title">D1 · QUERY</div>
+      <div class="metric" id="cons-d1-queries">—</div>
+      <div class="metric-sub" id="cons-d1-rows">Righe elaborate: —</div>
+    </div>
+    <div class="card">
+      <div class="card-title">WORKERS · RICHIESTE</div>
+      <div class="metric" id="cons-worker-requests">—</div>
+      <div class="metric-sub" id="cons-worker-errors">Errori: —</div>
+    </div>
+  </div>
+
+  <div class="section-heading">Archiviazione R2</div>
+  <div class="panel" style="margin-bottom:22px">
+    <table>
+      <thead><tr><th>Classe</th><th>Oggetti</th><th>Spazio occupato</th></tr></thead>
+      <tbody id="cons-r2-table"><tr><td colspan="3">In attesa dei dati</td></tr></tbody>
+    </table>
+  </div>
+
+  <div class="section-heading">Database D1</div>
+  <div class="panel" style="margin-bottom:22px">
+    <table>
+      <thead><tr><th>Database</th><th>Dimensione</th><th>Letture</th><th>Scritture</th><th>Righe lette</th><th>Righe scritte</th></tr></thead>
+      <tbody id="cons-d1-table"><tr><td colspan="6">In attesa dei dati</td></tr></tbody>
+    </table>
+  </div>
+
+  <div class="section-heading">Workers</div>
+  <div class="panel" style="margin-bottom:22px">
+    <table>
+      <thead><tr><th>Worker</th><th>Richieste</th><th>Errori</th><th>CPU P50 (µs)</th><th>CPU P99 (µs)</th></tr></thead>
+      <tbody id="cons-workers-table"><tr><td colspan="5">In attesa dei dati</td></tr></tbody>
+    </table>
+  </div>
+  <p class="metric-sub">I dati non disponibili vengono indicati con —. Nessuna percentuale di utilizzo viene stimata.</p>
 </div>
 
 <div class="modal-overlay" id="details-modal" onclick="if(event.target===this)closeDetails()">
@@ -244,6 +313,9 @@ window.appsData=workers;
 document.getElementById("apps").innerHTML=workers.map(function(w){
   return "<tr><td><div class='app-name'>"+esc(w.name)+"</div><div class='app-type'>"+esc(w.description)+"</div></td><td>"+esc(w.id)+"</td><td>"+esc(w.database_name||w.database_check)+"</td><td>"+esc(date(w.modified_on))+"</td><td><button class='detail-btn' onclick='showDetails("+JSON.stringify(w.id)+")'>Dettagli</button></td></tr>";
 }).join("")||"<tr><td colspan='5'>Nessuna applicazione trovata</td></tr>";
+document.getElementById("worker-list").innerHTML=workers.map(function(w){
+  return "<tr><td><div class='app-name'>"+esc(w.name)+"</div><div class='app-type'>"+esc(w.description)+"</div></td><td>"+esc(w.id)+"</td><td>"+esc(w.version_number!=null?"v"+w.version_number:"—")+"</td><td>"+esc(w.compatibility_date||"—")+"</td><td>"+esc(date(w.created_on))+"</td><td>"+esc(date(w.modified_on))+"</td><td>"+esc((w.bindings||[]).length)+"</td></tr>";
+}).join("")||"<tr><td colspan='7'>Nessun Worker trovato</td></tr>";
 document.getElementById("databases").innerHTML=db.map(function(d){return "<tr><td><div class='app-name'>"+esc(d.name)+"</div></td><td>"+esc(size(d.file_size))+"</td><td>"+esc(d.num_tables)+"</td><td><span class='pill'>Disponibile</span></td></tr>"}).join("")||"<tr><td colspan='4'>Nessun database trovato</td></tr>";
 document.getElementById("buckets").innerHTML=buckets.map(function(b){return "<tr><td><div class='app-name'>"+esc(b.name)+"</div></td><td>"+esc(date(b.creation_date))+"</td><td><span class='pill'>Disponibile</span></td></tr>"}).join("")||"<tr><td colspan='3'>Nessun bucket trovato</td></tr>";
 status.innerHTML="<span style='font-size:21px'>✓</span><div><strong>Account collegato correttamente</strong>Dati aggiornati direttamente dalle API Cloudflare. Le statistiche di consumo non ancora disponibili sono lasciate non valorizzate.</div>";
@@ -254,16 +326,140 @@ status.innerHTML="<span>!</span><div><strong>Errore di collegamento</strong>"+es
 document.getElementById("account").textContent="☁ Account Cloudflare · Errore";
 }
 }
+
+
+let analyticsLoading=false;
+
+function consNumber(value){
+  return Number(value||0).toLocaleString("it-IT");
+}
+
+function consBytes(value){
+  if(value==null||!Number.isFinite(Number(value)))return "—";
+  var n=Number(value),units=["B","KB","MB","GB","TB"],i=0;
+  while(n>=1024&&i<units.length-1){n/=1024;i++;}
+  return n.toLocaleString("it-IT",{maximumFractionDigits:2})+" "+units[i];
+}
+
+function consCpu(value){
+  return value==null?"—":Number(value).toLocaleString("it-IT",{maximumFractionDigits:2})+" µs";
+}
+
+async function loadAnalytics(){
+  if(analyticsLoading)return;
+  analyticsLoading=true;
+  var status=document.getElementById("consumption-status");
+  status.textContent="Caricamento statistiche Cloudflare...";
+  try{
+    var responses=await Promise.all([
+      fetch("/api/resources"),
+      fetch("/api/analytics")
+    ]);
+    var resources=await responses[0].json();
+    var analytics=await responses[1].json();
+
+    if(!responses[0].ok||!resources.success)throw new Error(resources.error||"Errore risorse");
+    if(!responses[1].ok||!analytics.success)throw new Error(analytics.error||"Errore analytics");
+
+    var metric=resources.r2_metrics;
+    var r2Rows=[],totalObjects=0,totalBytes=0;
+
+    ["standard","infrequentAccess"].forEach(function(key){
+      var item=metric&&metric[key];
+      if(!item)return;
+      var uploaded=item.uploaded||{},published=item.published||{};
+      var objects=Number(uploaded.objects||0)+Number(published.objects||0);
+      var bytes=Number(uploaded.payloadSize||0)+Number(uploaded.metadataSize||0)
+        +Number(published.payloadSize||0)+Number(published.metadataSize||0);
+      totalObjects+=objects;
+      totalBytes+=bytes;
+      r2Rows.push("<tr><td>"+(key==="standard"?"Standard":"Infrequent Access")+"</td><td>"+consNumber(objects)+"</td><td>"+consBytes(bytes)+"</td></tr>");
+    });
+
+    document.getElementById("cons-r2-state").textContent=resources.r2_metrics_error?"R2 · Errore":"R2 · "+(metric?"Operativo":"Non disponibile");
+    document.getElementById("cons-r2-state").style.background=resources.r2_metrics_error?"#fee2e2":"#dcfce7";
+    document.getElementById("cons-r2-size").textContent=metric?consBytes(totalBytes):"—";
+    document.getElementById("cons-r2-objects").textContent="Oggetti: "+(metric?consNumber(totalObjects):"—");
+    document.getElementById("cons-r2-table").innerHTML=r2Rows.join("")||"<tr><td colspan='3'>Metriche R2 non disponibili</td></tr>";
+
+    var dbs=resources.databases||[];
+    var d1=analytics.d1||[];
+    var d1ById={};
+    d1.forEach(function(d){d1ById[d.database_id]=d;});
+
+    var d1Read=0,d1Write=0,d1Rows=0;
+    d1.forEach(function(d){
+      d1Read+=Number(d.read_queries||0);
+      d1Write+=Number(d.write_queries||0);
+      d1Rows+=Number(d.rows_read||0)+Number(d.rows_written||0);
+    });
+
+    var d1Failed=Boolean(analytics.d1_error);
+    document.getElementById("cons-d1-state").textContent=d1Failed?"D1 · Errore":"D1 · Operativo";
+    document.getElementById("cons-d1-state").style.background=d1Failed?"#fee2e2":"#dcfce7";
+    document.getElementById("cons-d1-queries").textContent=d1Failed?"—":consNumber(d1Read+d1Write);
+    document.getElementById("cons-d1-rows").textContent="Righe elaborate: "+(d1Failed?"—":consNumber(d1Rows));
+
+    document.getElementById("cons-d1-table").innerHTML=dbs.map(function(db){
+      var d=d1ById[db.uuid]||d1ById[db.id];
+      var v=function(key){return d?consNumber(d[key]):(d1Failed?"—":"0");};
+      return "<tr><td>"+esc(db.name)+"</td><td>"+consBytes(db.file_size)+"</td><td>"+v("read_queries")+"</td><td>"+v("write_queries")+"</td><td>"+v("rows_read")+"</td><td>"+v("rows_written")+"</td></tr>";
+    }).join("")||"<tr><td colspan='6'>Nessun database disponibile</td></tr>";
+
+    var workers=analytics.workers||[];
+    var workerFailed=Boolean(analytics.workers_error);
+    var requests=0,errors=0;
+
+    workers.forEach(function(w){
+      requests+=Number((w.sum||{}).requests||0);
+      errors+=Number((w.sum||{}).errors||0);
+    });
+
+    document.getElementById("cons-workers-state").textContent=workerFailed?"Workers · Errore":"Workers · Operativo";
+    document.getElementById("cons-workers-state").style.background=workerFailed?"#fee2e2":"#dcfce7";
+    document.getElementById("cons-worker-requests").textContent=workerFailed?"—":consNumber(requests);
+    document.getElementById("cons-worker-errors").textContent="Errori: "+(workerFailed?"—":consNumber(errors));
+
+    document.getElementById("cons-workers-table").innerHTML=workers.map(function(w){
+      var sums=w.sum||{},cpu=w.quantiles||{};
+      return "<tr><td>"+esc((w.dimensions||{}).scriptName)+"</td><td>"+consNumber(sums.requests)+"</td><td>"+consNumber(sums.errors)+"</td><td>"+consCpu(cpu.cpuTimeP50)+"</td><td>"+consCpu(cpu.cpuTimeP99)+"</td></tr>";
+    }).join("")||"<tr><td colspan='5'>"+(workerFailed?"Statistiche Workers non disponibili":"Nessuna richiesta nel periodo")+"</td></tr>";
+
+    var warnings=[];
+    if(resources.r2_metrics_error)warnings.push("R2: "+resources.r2_metrics_error);
+    if(analytics.d1_error)warnings.push("D1: "+analytics.d1_error);
+    if(analytics.workers_error)warnings.push("Workers: "+analytics.workers_error);
+
+    var updatedAt=new Date().toLocaleString("it-IT");
+    status.textContent=warnings.length
+      ?"Dati parziali · "+warnings.join(" | ")
+      :"Monitoraggio aggiornato correttamente";
+    document.getElementById("consumption-updated").textContent="Ultimo aggiornamento: "+updatedAt;
+    ["cons-r2-state","cons-d1-state","cons-workers-state"].forEach(function(id){
+      var el=document.getElementById(id);
+      el.style.color="#1f2937";
+      el.style.padding="6px 10px";
+      el.style.borderRadius="20px";
+    });
+
+  }catch(e){
+    status.textContent="Errore caricamento: "+e.message;
+  }finally{
+    analyticsLoading=false;
+  }
+}
+
 const main=document.querySelector(".main");
 const sections=Array.from(main.children);
 const views={
-  "dashboard-top":{title:"Dashboard",subtitle:"Panoramica delle risorse del tuo account Cloudflare",items:[0,1,2,3,14]},
-  "applications-section":{title:"Applicazioni",subtitle:"Elenco delle applicazioni monitorate",items:[0,1,4,5,14]},
-  "workers-section":{title:"Workers",subtitle:"Gestione e monitoraggio dei Workers Cloudflare",items:[0,1,4,5,14]},
-  "database-section":{title:"Database D1",subtitle:"Database collegati al tuo account Cloudflare",items:[0,1,6,7,14]},
-  "r2-section":{title:"Archiviazione R2",subtitle:"Gestione dei bucket di archiviazione",items:[0,1,8,9,14]},
-  "alerts-section":{title:"Avvisi",subtitle:"Notifiche e segnalazioni del sistema",items:[0,1,10,11,14]},
-  "settings-section":{title:"Impostazioni",subtitle:"Configurazione del Control Center",items:[0,1,12,13,14]}
+  "dashboard-top":{title:"Dashboard",subtitle:"Panoramica delle risorse del tuo account Cloudflare",items:[0,1,2,3,17,18]},
+  "applications-section":{title:"Applicazioni",subtitle:"Elenco delle applicazioni monitorate",items:[0,1,4,5,17,18]},
+  "workers-section":{title:"Workers",subtitle:"Dettaglio tecnico dei Workers Cloudflare",items:[0,1,6,7,17,18]},
+  "database-section":{title:"Database D1",subtitle:"Database collegati al tuo account Cloudflare",items:[0,1,8,9,17,18]},
+  "r2-section":{title:"Archiviazione R2",subtitle:"Gestione dei bucket di archiviazione",items:[0,1,10,11,17,18]},
+  "consumption-section":{title:"Consumi e capacità",subtitle:"Monitoraggio Cloudflare degli ultimi 7 giorni",items:[0,1,16,17,18]},
+  "alerts-section":{title:"Avvisi",subtitle:"Notifiche e segnalazioni del sistema",items:[0,1,12,13,17,18]},
+  "settings-section":{title:"Impostazioni",subtitle:"Configurazione del Control Center",items:[0,1,14,15,17,18]}
 };
 
 function openPage(target){
@@ -274,20 +470,16 @@ function openPage(target){
   main.querySelector("h1").textContent=view.title;
   main.querySelector(".subtitle").textContent=view.subtitle;
   main.querySelector(".breadcrumb strong").textContent=view.title;
-
   document.querySelectorAll(".nav[data-target]").forEach(function(item){
     item.classList.toggle("active",item.dataset.target===target);
   });
+  if(target==="consumption-section")loadAnalytics();
 }
 
 document.querySelectorAll(".nav[data-target]").forEach(function(item){
   item.addEventListener("click",function(){
     openPage(item.dataset.target);
   });
-});
-
-document.querySelectorAll('.nav[data-target="applications-section"]').forEach(function(item){
-  item.dataset.target="applications-section";
 });
 
 openPage("dashboard-top");
@@ -325,6 +517,38 @@ async function cloudflare<T>(
   return result.result;
 }
 
+
+async function cloudflareGraphQL<T>(
+  query: string,
+  variables: Record<string, unknown>,
+  env: Bindings
+): Promise<T> {
+  const response = await fetch(
+    "https://api.cloudflare.com/client/v4/graphql",
+    {
+      method: "POST",
+      headers: {
+        Authorization: "Bearer " + env.CLOUDFLARE_API_TOKEN,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({ query, variables })
+    }
+  );
+
+  const result = await response.json() as {
+    data?: T;
+    errors?: Array<{message?: string}>;
+  };
+
+  if (!response.ok || result.errors?.length || !result.data) {
+    throw new Error(
+      result.errors?.[0]?.message || "Errore Cloudflare GraphQL"
+    );
+  }
+
+  return result.data;
+}
+
 export default {
   async fetch(request: Request, env: Bindings): Promise<Response> {
     const url = new URL(request.url);
@@ -359,6 +583,15 @@ export default {
               creation_date: string;
             }> }>(base + "/r2/buckets", env)
           ]);
+
+        let r2Metrics: unknown = null;
+        let r2MetricsError: string | null = null;
+
+        try {
+          r2Metrics = await cloudflare<unknown>(base + "/r2/metrics", env);
+        } catch (error) {
+          r2MetricsError = error instanceof Error ? error.message : "Metriche R2 non disponibili";
+        }
 
         const workers = await Promise.all(
           workerResult
@@ -459,6 +692,8 @@ export default {
           workers,
           databases,
           buckets: bucketResult.buckets || [],
+            r2_metrics: r2Metrics,
+            r2_metrics_error: r2MetricsError,
           updated_at: new Date().toISOString()
         });
       } catch {
@@ -467,6 +702,164 @@ export default {
           error: "Impossibile leggere le risorse Cloudflare. Controlla i permessi del token API."
         }, {status: 502});
       }
+    }
+
+
+    if (url.pathname === "/api/analytics") {
+      const account = env.CLOUDFLARE_ACCOUNT_ID;
+      const now = new Date();
+      const start = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+      const dateStart = start.toISOString().slice(0, 10);
+      const dateEnd = now.toISOString().slice(0, 10);
+
+      const d1Query = `
+        query D1Metrics($accountTag: string!, $start: Date!, $end: Date!) {
+          viewer {
+            accounts(filter: {accountTag: $accountTag}) {
+              d1AnalyticsAdaptiveGroups(
+                limit: 10000
+                filter: {date_geq: $start, date_leq: $end}
+              ) {
+                dimensions {
+                  databaseId
+                  date
+                }
+                sum {
+                  readQueries
+                  writeQueries
+                  rowsRead
+                  rowsWritten
+                }
+              }
+            }
+          }
+        }
+      `;
+
+      const workersQuery = `
+        query WorkersMetrics(
+          $accountTag: string!,
+          $start: Time!,
+          $end: Time!
+        ) {
+          viewer {
+            accounts(filter: {accountTag: $accountTag}) {
+              workersInvocationsAdaptive(
+                limit: 10000
+                filter: {
+                  datetime_geq: $start,
+                  datetime_leq: $end
+                }
+              ) {
+                dimensions {
+                  scriptName
+                }
+                sum {
+                  requests
+                  errors
+                }
+                quantiles {
+                  cpuTimeP50
+                  cpuTimeP99
+                }
+              }
+            }
+          }
+        }
+      `;
+
+      const [d1Result, workersResult] = await Promise.allSettled([
+        cloudflareGraphQL<{
+          viewer: {
+            accounts: Array<{
+              d1AnalyticsAdaptiveGroups: Array<{
+                dimensions: {databaseId: string; date: string};
+                sum: {
+                  readQueries: number;
+                  writeQueries: number;
+                  rowsRead: number;
+                  rowsWritten: number;
+                };
+              }>;
+            }>;
+          };
+        }>(d1Query, {
+          accountTag: account,
+          start: dateStart,
+          end: dateEnd
+        }, env),
+
+        cloudflareGraphQL<{
+          viewer: {
+            accounts: Array<{
+              workersInvocationsAdaptive: Array<{
+                dimensions: {scriptName: string};
+                sum: {requests: number; errors: number};
+                quantiles: {
+                  cpuTimeP50: number | null;
+                  cpuTimeP99: number | null;
+                };
+              }>;
+            }>;
+          };
+        }>(workersQuery, {
+          accountTag: account,
+          start: start.toISOString(),
+          end: now.toISOString()
+        }, env)
+      ]);
+
+      const d1Groups = d1Result.status === "fulfilled"
+        ? d1Result.value.viewer.accounts[0]?.d1AnalyticsAdaptiveGroups || []
+        : [];
+
+      const workerGroups = workersResult.status === "fulfilled"
+        ? workersResult.value.viewer.accounts[0]?.workersInvocationsAdaptive || []
+        : [];
+
+      const d1 = Object.values(
+        d1Groups.reduce((acc, group) => {
+          const id = group.dimensions.databaseId;
+          if (!acc[id]) {
+            acc[id] = {
+              database_id: id,
+              read_queries: 0,
+              write_queries: 0,
+              rows_read: 0,
+              rows_written: 0
+            };
+          }
+          acc[id].read_queries += group.sum.readQueries || 0;
+          acc[id].write_queries += group.sum.writeQueries || 0;
+          acc[id].rows_read += group.sum.rowsRead || 0;
+          acc[id].rows_written += group.sum.rowsWritten || 0;
+          return acc;
+        }, {} as Record<string, {
+          database_id: string;
+          read_queries: number;
+          write_queries: number;
+          rows_read: number;
+          rows_written: number;
+        }>)
+      );
+
+      return Response.json({
+        success: true,
+        period: {
+          start: start.toISOString(),
+          end: now.toISOString(),
+          days: 7
+        },
+        d1,
+        d1_error: d1Result.status === "rejected"
+          ? String(d1Result.reason)
+          : null,
+        workers: workerGroups,
+        workers_error: workersResult.status === "rejected"
+          ? String(workersResult.reason)
+          : null,
+        updated_at: now.toISOString()
+      });
     }
 
     if (url.pathname === "/favicon.ico") {
