@@ -1,0 +1,12 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "cloudflare-control-center",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-11-11",
+  "observability": {
+    "enabled": true
+  },
+  "vars": {
+    "CLOUDFLARE_ACCOUNT_ID": "556d187fb5ed17bf2e4a07030115e22d"
+  }
+}
