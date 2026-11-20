@@ -175,7 +175,11 @@ async function getFirestoreUsageMetrics(
 
       if (!response.ok) {
         results[metric.key] = null;
-        errors.push(`${metric.key}: HTTP ${response.status}`);
+        const errorBody = await response.json().catch(() => ({})) as {
+          error?: { message?: string; status?: string };
+        };
+        const message = errorBody.error?.message || "Errore non specificato";
+        errors.push(`${metric.key}: HTTP ${response.status} - ${message}`);
         continue;
       }
 
