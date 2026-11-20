@@ -88,12 +88,14 @@ async function getAccessToken(env: FirebaseEnv): Promise<{
   return { token: cachedToken.token, projectId: account.project_id };
 }
 
-export async function getFirebaseStatus(env: FirebaseEnv) {
-  const { token, projectId } = await getAccessToken(env);
-
+async function countCollectionDocuments(
+  token: string,
+  projectId: string,
+  collectionId: string
+): Promise<number | null> {
   const endpoint =
     `https://firestore.googleapis.com/v1/projects/${encodeURIComponent(projectId)}` +
-    "/databases/(default)/documents:listCollectionIds";
+    "/databases/(default)/documents:runAggregationQuery";
 
   const response = await fetch(endpoint, {
     method: "POST",
@@ -101,18 +103,80 @@ export async function getFirebaseStatus(env: FirebaseEnv) {
       Authorization: `Bearer ${token}`,
       "Content-Type": "application/json"
     },
-    body: JSON.stringify({ pageSize: 1000 })
+    body: JSON.stringify({
+      structuredAggregationQuery: {
+        structuredQuery: {
+          from: [{ collectionId }]
+        },
+        aggregations: [{ count: {}, alias: "total" }]
+      }
+    })
   });
 
-  if (!response.ok) {
-    throw new Error(`Firestore non raggiungibile (HTTP ${response.status}).`);
-  }
+  if (!response.ok) return null;
 
-  const result = await response.json() as {
-    collectionIds?: string[];
-  };
+  const result = await response.json() as Array<{
+    result?: {
+      aggregateFields?: {
+        total?: { integerValue?: string };
+      };
+    };
+  }>;
 
-  const collections = result.collectionIds || [];
+  const value = result[0]?.result?.aggregateFields?.total?.integerValue;
+  return value === undefined ? null : Number(value);
+}
+
+export async function getFirebaseStatus(env: FirebaseEnv) {
+  const { token, projectId } = await getAccessToken(env);
+
+  const endpoint =
+    `https://firestore.googleapis.com/v1/projects/${encodeURIComponent(projectId)}` +
+    "/databases/(default)/documents:listCollectionIds";
+
+  const collections: string[] = [];
+  let pageToken: string | undefined;
+
+  do {
+    const response = await fetch(endpoint, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        pageSize: 1000,
+        ...(pageToken ? { pageToken } : {})
+      })
+    });
+
+    if (!response.ok) {
+      throw new Error(`Firestore non raggiungibile (HTTP ${response.status}).`);
+    }
+
+    const result = await response.json() as {
+      collectionIds?: string[];
+      nextPageToken?: string;
+    };
+
+    collections.push(...(result.collectionIds || []));
+    pageToken = result.nextPageToken;
+  } while (pageToken);
+
+  const collectionDetails = await Promise.all(
+    collections.map(async name => ({
+      name,
+      documents_count: await countCollectionDocuments(token, projectId, name)
+    }))
+  );
+
+  const totalDocuments = collectionDetails.every(
+    item => item.documents_count !== null
+  )
+    ? collectionDetails.reduce(
+        (total, item) => total + (item.documents_count || 0), 0
+      )
+    : null;
 
   return {
     connected: true,
@@ -120,6 +184,8 @@ export async function getFirebaseStatus(env: FirebaseEnv) {
     database: "(default)",
     collections,
     collections_count: collections.length,
+    collection_details: collectionDetails,
+    total_documents: totalDocuments,
     checked_at: new Date().toISOString()
   };
 }

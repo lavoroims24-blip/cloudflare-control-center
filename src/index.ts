@@ -252,6 +252,10 @@ td{padding:15px;border-top:1px solid var(--border);font-size:12px}
         <div class="card-title">COLLEZIONI RILEVATE</div>
         <div class="metric" id="firebase-count">—</div>
       </div>
+      <div class="card">
+        <div class="card-title">DOCUMENTI TOTALI</div>
+        <div class="metric" id="firebase-total-documents">—</div>
+      </div>
     </div>
 
     <div class="section-heading" style="margin-top:24px">Collezioni Firestore</div>
@@ -502,6 +506,7 @@ async function loadFirebase(){
   const project=document.getElementById("firebase-project");
   const database=document.getElementById("firebase-database");
   const count=document.getElementById("firebase-count");
+  const totalDocuments=document.getElementById("firebase-total-documents");
   const list=document.getElementById("firebase-collections");
   const updated=document.getElementById("firebase-updated");
 
@@ -519,6 +524,9 @@ async function loadFirebase(){
     project.textContent=data.project_id || "—";
     database.textContent=data.database || "—";
     count.textContent=String(data.collections_count ?? 0);
+    totalDocuments.textContent=data.total_documents===null
+      || data.total_documents===undefined
+      ?"—":Number(data.total_documents).toLocaleString("it-IT");
 
     status.textContent="✓ Firebase / Firestore connesso";
     status.style.color="#15803d";
@@ -532,9 +540,16 @@ async function loadFirebase(){
       item.textContent="Nessuna collezione rilevata.";
       list.appendChild(item);
     }else{
+      const details=Array.isArray(data.collection_details)
+        ?data.collection_details:[];
       collections.forEach(function(name){
         const item=document.createElement("li");
-        item.textContent=name;
+        const detail=details.find(function(entry){return entry.name===name;});
+        const documents=detail && detail.documents_count!==null
+          && detail.documents_count!==undefined
+          ?Number(detail.documents_count).toLocaleString("it-IT")
+          :"—";
+        item.textContent=name+" — "+documents+" documenti";
         list.appendChild(item);
       });
     }
@@ -550,6 +565,7 @@ async function loadFirebase(){
     project.textContent="—";
     database.textContent="—";
     count.textContent="—";
+    totalDocuments.textContent="—";
 
     list.replaceChildren();
 
