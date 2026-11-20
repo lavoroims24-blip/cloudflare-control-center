@@ -256,6 +256,18 @@ td{padding:15px;border-top:1px solid var(--border);font-size:12px}
         <div class="card-title">DOCUMENTI TOTALI</div>
         <div class="metric" id="firebase-total-documents">—</div>
       </div>
+      <div class="card">
+        <div class="card-title">LETTURE · 7 GIORNI</div>
+        <div class="metric" id="firebase-reads">—</div>
+      </div>
+      <div class="card">
+        <div class="card-title">SCRITTURE · 7 GIORNI</div>
+        <div class="metric" id="firebase-writes">—</div>
+      </div>
+      <div class="card">
+        <div class="card-title">ELIMINAZIONI · 7 GIORNI</div>
+        <div class="metric" id="firebase-deletes">—</div>
+      </div>
     </div>
 
     <div class="section-heading" style="margin-top:24px">Collezioni Firestore</div>
@@ -507,6 +519,9 @@ async function loadFirebase(){
   const database=document.getElementById("firebase-database");
   const count=document.getElementById("firebase-count");
   const totalDocuments=document.getElementById("firebase-total-documents");
+  const reads=document.getElementById("firebase-reads");
+  const writes=document.getElementById("firebase-writes");
+  const deletes=document.getElementById("firebase-deletes");
   const list=document.getElementById("firebase-collections");
   const updated=document.getElementById("firebase-updated");
 
@@ -527,6 +542,13 @@ async function loadFirebase(){
     totalDocuments.textContent=data.total_documents===null
       || data.total_documents===undefined
       ?"—":Number(data.total_documents).toLocaleString("it-IT");
+    const metrics=data.usage_metrics || {};
+    reads.textContent=metrics.reads===null || metrics.reads===undefined
+      ?"—":Number(metrics.reads).toLocaleString("it-IT");
+    writes.textContent=metrics.writes===null || metrics.writes===undefined
+      ?"—":Number(metrics.writes).toLocaleString("it-IT");
+    deletes.textContent=metrics.deletes===null || metrics.deletes===undefined
+      ?"—":Number(metrics.deletes).toLocaleString("it-IT");
 
     status.textContent="✓ Firebase / Firestore connesso";
     status.style.color="#15803d";
@@ -566,6 +588,9 @@ async function loadFirebase(){
     database.textContent="—";
     count.textContent="—";
     totalDocuments.textContent="—";
+    reads.textContent="—";
+    writes.textContent="—";
+    deletes.textContent="—";
 
     list.replaceChildren();
 

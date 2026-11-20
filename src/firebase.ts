@@ -18,7 +18,10 @@ interface CachedToken {
 let cachedToken: CachedToken | null = null;
 
 const TOKEN_URL = "https://oauth2.googleapis.com/token";
-const FIRESTORE_SCOPE = "https://www.googleapis.com/auth/datastore";
+const GOOGLE_SCOPES = [
+  "https://www.googleapis.com/auth/datastore",
+  "https://www.googleapis.com/auth/monitoring.read"
+].join(" ");
 
 async function getAccessToken(env: FirebaseEnv): Promise<{
   token: string;
@@ -51,7 +54,7 @@ async function getAccessToken(env: FirebaseEnv): Promise<{
 
   const now = Math.floor(Date.now() / 1000);
 
-  const assertion = await new SignJWT({ scope: FIRESTORE_SCOPE })
+  const assertion = await new SignJWT({ scope: GOOGLE_SCOPES })
     .setProtectedHeader({ alg: "RS256", typ: "JWT" })
     .setIssuer(account.client_email)
     .setAudience(TOKEN_URL)
@@ -127,6 +130,95 @@ async function countCollectionDocuments(
   return value === undefined ? null : Number(value);
 }
 
+
+async function getFirestoreUsageMetrics(
+  token: string,
+  projectId: string
+) {
+  const metrics = [
+    { key: "reads", type: "document/read_ops_count" },
+    { key: "writes", type: "document/write_ops_count" },
+    { key: "deletes", type: "document/delete_ops_count" }
+  ] as const;
+
+  const end = new Date();
+  const start = new Date(end.getTime() - 7 * 24 * 60 * 60 * 1000);
+
+  const results: Record<string, number | null> = {};
+  const errors: string[] = [];
+
+  for (const metric of metrics) {
+    const filter =
+      'resource.type = "firestore.googleapis.com/Database" AND ' +
+      'resource.labels.database_id = "(default)" AND ' +
+      `metric.type = "firestore.googleapis.com/${metric.type}"`;
+
+    const params = new URLSearchParams({
+      filter,
+      "interval.startTime": start.toISOString(),
+      "interval.endTime": end.toISOString(),
+      "aggregation.alignmentPeriod": "604800s",
+      "aggregation.perSeriesAligner": "ALIGN_SUM",
+      "aggregation.crossSeriesReducer": "REDUCE_SUM",
+      view: "FULL",
+      pageSize: "10000"
+    });
+
+    const endpoint =
+      `https://monitoring.googleapis.com/v3/projects/${encodeURIComponent(projectId)}` +
+      `/timeSeries?${params.toString()}`;
+
+    try {
+      const response = await fetch(endpoint, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+
+      if (!response.ok) {
+        results[metric.key] = null;
+        errors.push(`${metric.key}: HTTP ${response.status}`);
+        continue;
+      }
+
+      const data = await response.json() as {
+        timeSeries?: Array<{
+          points?: Array<{
+            value?: { int64Value?: string };
+          }>;
+        }>;
+      };
+
+      let total = 0;
+      let found = false;
+
+      for (const series of data.timeSeries || []) {
+        for (const point of series.points || []) {
+          const value = point.value?.int64Value;
+          if (value !== undefined) {
+            total += Number(value);
+            found = true;
+          }
+        }
+      }
+
+      results[metric.key] = found ? total : null;
+    } catch {
+      results[metric.key] = null;
+      errors.push(`${metric.key}: errore di rete`);
+    }
+  }
+
+  return {
+    period_days: 7,
+    start_time: start.toISOString(),
+    end_time: end.toISOString(),
+    reads: results.reads ?? null,
+    writes: results.writes ?? null,
+    deletes: results.deletes ?? null,
+    available: Object.values(results).some(value => value !== null),
+    errors
+  };
+}
+
 export async function getFirebaseStatus(env: FirebaseEnv) {
   const { token, projectId } = await getAccessToken(env);
 
@@ -178,6 +270,8 @@ export async function getFirebaseStatus(env: FirebaseEnv) {
       )
     : null;
 
+  const usageMetrics = await getFirestoreUsageMetrics(token, projectId);
+
   return {
     connected: true,
     project_id: projectId,
@@ -186,6 +280,7 @@ export async function getFirebaseStatus(env: FirebaseEnv) {
     collections_count: collections.length,
     collection_details: collectionDetails,
     total_documents: totalDocuments,
+    usage_metrics: usageMetrics,
     checked_at: new Date().toISOString()
   };
 }
