@@ -1,4 +1,6 @@
-interface Bindings {
+import { getFirebaseStatus, type FirebaseEnv } from "./firebase";
+
+interface Bindings extends FirebaseEnv {
   CLOUDFLARE_ACCOUNT_ID: string;
   CLOUDFLARE_API_TOKEN: string;
 }
@@ -27,6 +29,10 @@ const apps: Record<string, {name: string; description: string}> = {
   "stato-odl": {
     name: "Stato ODL",
     description: "Monitoraggio ordini di lavoro"
+  },
+  "impianti-primari": {
+    name: "IMPIANTI PRIMARI",
+    description: "Gestione impianti primari e attività"
   }
 };
 
@@ -107,6 +113,7 @@ td{padding:15px;border-top:1px solid var(--border);font-size:12px}
 <div class="nav" data-target="r2-section"><span class="icon">▧</span><span>Archiviazione R2</span></div>
 <div class="section-label">SISTEMA</div>
 <div class="nav" data-target="consumption-section"><span class="icon">◫</span><span>Consumi e capacità</span></div>
+<div class="nav" data-target="firebase-section"><span class="icon">🔥</span><span>Firebase / Firestore</span></div>
 <div class="nav" data-target="alerts-section"><span class="icon">♧</span><span>Avvisi</span></div>
 <div class="nav" data-target="settings-section"><span class="icon">⚙</span><span>Impostazioni</span></div>
 <div class="sidebar-bottom"><strong>Piano Cloudflare</strong>Free · Monitoraggio account</div>
@@ -216,6 +223,47 @@ td{padding:15px;border-top:1px solid var(--border);font-size:12px}
     </table>
   </div>
   <p class="metric-sub">I dati non disponibili vengono indicati con —. Nessuna percentuale di utilizzo viene stimata.</p>
+</div>
+
+<div id="firebase-section" style="display:none">
+  <div class="section-heading">Monitoraggio Firebase / Firestore</div>
+
+  <div class="panel" style="padding:22px;margin-bottom:20px">
+    <div style="display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;align-items:center">
+      <div>
+        <strong>Stato connessione Firebase</strong>
+        <p class="metric-sub">Controllo in sola lettura del database Firestore.</p>
+      </div>
+      <button class="refresh" onclick="loadFirebase()">↻ Aggiorna Firebase</button>
+    </div>
+
+    <p id="firebase-status" class="metric-sub">In attesa del controllo.</p>
+
+    <div class="grid" style="margin-top:18px">
+      <div class="card">
+        <div class="card-title">PROGETTO</div>
+        <div class="metric" id="firebase-project" style="font-size:19px">—</div>
+      </div>
+      <div class="card">
+        <div class="card-title">DATABASE</div>
+        <div class="metric" id="firebase-database" style="font-size:19px">—</div>
+      </div>
+      <div class="card">
+        <div class="card-title">COLLEZIONI RILEVATE</div>
+        <div class="metric" id="firebase-count">—</div>
+      </div>
+    </div>
+
+    <div class="section-heading" style="margin-top:24px">Collezioni Firestore</div>
+
+    <div class="panel" style="padding:16px">
+      <ul id="firebase-collections" class="metric-sub" style="padding-left:22px;margin:0">
+        <li>In attesa dei dati</li>
+      </ul>
+    </div>
+
+    <p class="metric-sub" id="firebase-updated">Ultimo controllo: —</p>
+  </div>
 </div>
 
 <div class="modal-overlay" id="details-modal" onclick="if(event.target===this)closeDetails()">
@@ -449,17 +497,82 @@ async function loadAnalytics(){
   }
 }
 
+async function loadFirebase(){
+  const status=document.getElementById("firebase-status");
+  const project=document.getElementById("firebase-project");
+  const database=document.getElementById("firebase-database");
+  const count=document.getElementById("firebase-count");
+  const list=document.getElementById("firebase-collections");
+  const updated=document.getElementById("firebase-updated");
+
+  status.textContent="Verifica della connessione Firebase in corso...";
+  status.style.color="#64748b";
+
+  try{
+    const response=await fetch("/api/firebase");
+    const data=await response.json();
+
+    if(!response.ok || !data.success){
+      throw new Error(data.error || "Connessione Firebase non riuscita.");
+    }
+
+    project.textContent=data.project_id || "—";
+    database.textContent=data.database || "—";
+    count.textContent=String(data.collections_count ?? 0);
+
+    status.textContent="✓ Firebase / Firestore connesso";
+    status.style.color="#15803d";
+
+    list.replaceChildren();
+
+    const collections=Array.isArray(data.collections)?data.collections:[];
+
+    if(collections.length===0){
+      const item=document.createElement("li");
+      item.textContent="Nessuna collezione rilevata.";
+      list.appendChild(item);
+    }else{
+      collections.forEach(function(name){
+        const item=document.createElement("li");
+        item.textContent=name;
+        list.appendChild(item);
+      });
+    }
+
+    updated.textContent="Ultimo controllo: "+(data.checked_at
+      ?new Date(data.checked_at).toLocaleString("it-IT")
+      :"—");
+
+  }catch(error){
+    status.textContent="✕ "+(error.message || "Errore di connessione.");
+    status.style.color="#b91c1c";
+
+    project.textContent="—";
+    database.textContent="—";
+    count.textContent="—";
+
+    list.replaceChildren();
+
+    const item=document.createElement("li");
+    item.textContent="Impossibile caricare le collezioni.";
+    list.appendChild(item);
+
+    updated.textContent="Ultimo controllo: —";
+  }
+}
+
 const main=document.querySelector(".main");
 const sections=Array.from(main.children);
 const views={
-  "dashboard-top":{title:"Dashboard",subtitle:"Panoramica delle risorse del tuo account Cloudflare",items:[0,1,2,3,17,18]},
-  "applications-section":{title:"Applicazioni",subtitle:"Elenco delle applicazioni monitorate",items:[0,1,4,5,17,18]},
-  "workers-section":{title:"Workers",subtitle:"Dettaglio tecnico dei Workers Cloudflare",items:[0,1,6,7,17,18]},
-  "database-section":{title:"Database D1",subtitle:"Database collegati al tuo account Cloudflare",items:[0,1,8,9,17,18]},
-  "r2-section":{title:"Archiviazione R2",subtitle:"Gestione dei bucket di archiviazione",items:[0,1,10,11,17,18]},
-  "consumption-section":{title:"Consumi e capacità",subtitle:"Monitoraggio Cloudflare degli ultimi 7 giorni",items:[0,1,16,17,18]},
-  "alerts-section":{title:"Avvisi",subtitle:"Notifiche e segnalazioni del sistema",items:[0,1,12,13,17,18]},
-  "settings-section":{title:"Impostazioni",subtitle:"Configurazione del Control Center",items:[0,1,14,15,17,18]}
+  "dashboard-top":{title:"Dashboard",subtitle:"Panoramica delle risorse del tuo account Cloudflare",items:[0,1,2,3,18,19]},
+  "applications-section":{title:"Applicazioni",subtitle:"Elenco delle applicazioni monitorate",items:[0,1,4,5,18,19]},
+  "workers-section":{title:"Workers",subtitle:"Dettaglio tecnico dei Workers Cloudflare",items:[0,1,6,7,18,19]},
+  "database-section":{title:"Database D1",subtitle:"Database collegati al tuo account Cloudflare",items:[0,1,8,9,18,19]},
+  "r2-section":{title:"Archiviazione R2",subtitle:"Gestione dei bucket di archiviazione",items:[0,1,10,11,18,19]},
+  "consumption-section":{title:"Consumi e capacità",subtitle:"Monitoraggio Cloudflare degli ultimi 7 giorni",items:[0,1,16,18,19]},
+  "firebase-section":{title:"Firebase / Firestore",subtitle:"Monitoraggio del database Firebase",items:[0,1,17,18,19]},
+  "alerts-section":{title:"Avvisi",subtitle:"Notifiche e segnalazioni del sistema",items:[0,1,12,13,18,19]},
+  "settings-section":{title:"Impostazioni",subtitle:"Configurazione del Control Center",items:[0,1,14,15,18,19]}
 };
 
 function openPage(target){
@@ -474,6 +587,7 @@ function openPage(target){
     item.classList.toggle("active",item.dataset.target===target);
   });
   if(target==="consumption-section")loadAnalytics();
+  if(target==="firebase-section")loadFirebase();
 }
 
 document.querySelectorAll(".nav[data-target]").forEach(function(item){
@@ -559,6 +673,24 @@ export default {
         application: "Cloudflare Control Center",
         version: "0.2.0"
       });
+    }
+
+    if (url.pathname === "/api/firebase") {
+      try {
+        const firebase = await getFirebaseStatus(env);
+        return Response.json({
+          success: true,
+          ...firebase
+        });
+      } catch (error) {
+        return Response.json({
+          success: false,
+          connected: false,
+          error: error instanceof Error
+            ? error.message
+            : "Errore di collegamento Firebase."
+        }, { status: 502 });
+      }
     }
 
     if (url.pathname === "/api/resources") {
