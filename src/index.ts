@@ -266,9 +266,12 @@ td{padding:15px;border-top:1px solid var(--border);font-size:12px}
       </div>
       <div class="card">
         <div class="card-title">ELIMINAZIONI · 7 GIORNI</div>
-        <div class="metric" id="firebase-deletes">—</div>
+        <div class="metric" id="firebase-deletes">N/D</div>
       </div>
     </div>
+    <p class="metric-sub" style="margin:8px 0 0">
+      Non disponibile – piano gratuito. Google Cloud Monitoring richiede la fatturazione abilitata.
+    </p>
 
     <div class="section-heading" style="margin-top:24px">Collezioni Firestore</div>
 
@@ -542,13 +545,9 @@ async function loadFirebase(){
     totalDocuments.textContent=data.total_documents===null
       || data.total_documents===undefined
       ?"—":Number(data.total_documents).toLocaleString("it-IT");
-    const metrics=data.usage_metrics || {};
-    reads.textContent=metrics.reads===null || metrics.reads===undefined
-      ?"—":Number(metrics.reads).toLocaleString("it-IT");
-    writes.textContent=metrics.writes===null || metrics.writes===undefined
-      ?"—":Number(metrics.writes).toLocaleString("it-IT");
-    deletes.textContent=metrics.deletes===null || metrics.deletes===undefined
-      ?"—":Number(metrics.deletes).toLocaleString("it-IT");
+    reads.textContent="N/D";
+    writes.textContent="N/D";
+    deletes.textContent="N/D";
 
     status.textContent="✓ Firebase / Firestore connesso";
     status.style.color="#15803d";
